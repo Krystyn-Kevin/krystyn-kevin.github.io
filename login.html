@@ -47,12 +47,6 @@
     .catch(err => alert(err.message));
 }
   
-/*-------- sign up --------------------*/
-  auth.onAuthStateChanged(user => {
-    if(user){
-      window.location.replace("index.html");
-    }
-  });
 function signup() {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
@@ -62,7 +56,11 @@ function signup() {
     return;
   }
 
-  auth.createUserWithEmailAndPassword(email, password)
+  // Set persistence first, then create the user
+  auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+    .then(() => {
+      return auth.createUserWithEmailAndPassword(email, password);
+    })
     .then((userCredential) => {
       alert("Account created successfully!");
       window.location.replace("index.html");
@@ -71,6 +69,15 @@ function signup() {
       alert("Error: " + error.message);
     });
 }
+  auth.createUserWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+      alert("Account created successfully!");
+      window.location.replace("index.html");
+    })
+    .catch((error) => {
+      alert("Error: " + error.message);
+    });
+
 </script>
 
 </body>
