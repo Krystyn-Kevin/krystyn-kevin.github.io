@@ -567,27 +567,18 @@ const firebaseConfig = {
   appId: "1:257056491274:web:3e9f87abd76150bc1ddcf3",
   measurementId: "G-BQ68EJ5ZLN"
 };
-//=== FIREBASE LOGIN ===============
-function signUp(email, password){
-  return auth.createUserWithEmailAndPassword(email, password);
-}
-
-function login(email, password){
-  return auth.signInWithEmailAndPassword(email, password);
-}
-
-function logout(){
-  return auth.signOut();
-}
-//==== LOGIN STATE ========
-auth.onAuthStateChanged(user => {
-  if(user){
-    console.log("Logged in:", user.email);
-  } else {
-    console.log("Not logged in");
+//==== login.html call ========
+firebase.auth().onAuthStateChanged(user => {
+  if (!user) {
+    window.location.href = "login.html";
   }
 });
-
+//===== login state ==========
+firebase.auth().onAuthStateChanged(user => {
+  if (!user) {
+    window.location.href = "login.html";
+  }
+});
 // ══ STORAGE KEYS ════════════════════════════════════════════════
 const S_EXP   = 'spendex_v1';
 const S_CATS  = 'spendex_cats_v3';
