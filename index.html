@@ -106,7 +106,7 @@ nav { display:flex; gap:6px; }
 }
 .nav-btn:hover { border-color:var(--accent); color:var(--accent); }
 .nav-btn.active { background:var(--accent); color:var(--bg); border-color:var(--accent); font-weight:600; }
-
+  
 /* ── VIEWS ─────────────────────────────────────────────────── */
 .view { display:none; }
 .view.active { display:block; animation:fadeIn 0.3s ease; }
@@ -385,6 +385,8 @@ canvas { max-height:230px; }
         <button class="nav-btn"        onclick="switchView('analytics',this)">📊 Analytics</button>
         <button class="export-btn"     onclick="openExportModal()">⬇ Export PDF</button>
       </nav>
+      /*-----------------logout button---------------*/
+      <button class="nav-btn" onclick="logout()" style="color: var(--danger); border-color: var(--danger);">Logout</button>
     </div>
   </header>
 
@@ -1252,6 +1254,15 @@ function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2200);
+}
+// ══ AUTH FUNCTIONS ════════════════════════════════════════════════
+function logout() {
+  auth.signOut().then(() => {
+    // This will trigger onAuthStateChanged and redirect automatically
+    window.location.replace("login.html");
+  }).catch((err) => {
+    showToast("Error: " + err.message);
+  });
 }
 //=== FIREBASE CONNECTION =========
 const firebaseConfig = {
