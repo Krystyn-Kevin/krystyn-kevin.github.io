@@ -1,2 +1,2 @@
 # ExpenseManager
-Personal Expanse Tracking Web Based App
+Personal Expense Tracking Web Based App
