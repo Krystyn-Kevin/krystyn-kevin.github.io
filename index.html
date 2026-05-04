@@ -353,6 +353,43 @@ canvas { max-height:230px; }
   .stats-grid { grid-template-columns:1fr; }
   header { flex-direction:column; align-items:flex-start; }
 }
+/* ── PERIOD PICKERS ────────────────────────────────────────────── */
+#weekly-picker, #monthly-picker, #yearly-picker, #custom-picker {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+#weekly-picker input, #custom-picker input {
+  width: auto;
+}
+#weekly-picker .date-fields input {
+  font-size: 13px;
+  padding: 8px 6px;
+}
+select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  padding: 9px 12px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888890' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+select:focus { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -432,29 +469,76 @@ canvas { max-height:230px; }
       <div class="analytics-title">Analytics</div>
     </div>
 
-    <!-- FILTER PANEL -->
-    <div class="filter-panel">
-      <div class="filter-group">
-        <div class="filter-label">Period</div>
-        <div class="period-tabs">
-          <button class="period-tab active" onclick="setPeriod('daily',this)">Daily</button>
-          <button class="period-tab"        onclick="setPeriod('weekly',this)">Weekly</button>
-          <button class="period-tab"        onclick="setPeriod('monthly',this)">Monthly</button>
-          <button class="period-tab"        onclick="setPeriod('yearly',this)">Yearly</button>
-        </div>
-      </div>
-      <div class="filter-group" style="flex:1;min-width:200px">
-        <div class="filter-label">Categories &nbsp;<span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px">(tap to select · multiple allowed)</span></div>
-        <div class="cat-filter-row" id="cat-filter-row"></div>
-      </div>
-    </div>
+   <div class="filter-group" style="width:100%">
+  <div class="filter-label">Period</div>
+  <div class="period-tabs" style="flex-wrap:wrap;gap:6px">
+    <button class="period-tab active" onclick="setPeriod('daily',this)">Daily</button>
+    <button class="period-tab"        onclick="setPeriod('weekly',this)">Weekly</button>
+    <button class="period-tab"        onclick="setPeriod('monthly',this)">Monthly</button>
+    <button class="period-tab"        onclick="setPeriod('yearly',this)">Yearly</button>
+    <button class="period-tab"        onclick="setPeriod('custom',this)">Custom Days</button>
+  </div>
 
-    <!-- Date nav -->
-    <div class="date-nav">
-      <button class="nav-arrow" onclick="shiftPeriod(-1)">←</button>
-      <div class="date-label" id="date-label">—</div>
-      <button class="nav-arrow" onclick="shiftPeriod(1)">→</button>
+  <!-- WEEKLY: date range picker (hidden by default) -->
+  <div id="weekly-picker" style="display:none;margin-top:10px;display:none;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">From</span>
+    <div class="date-fields">
+      <input type="number" class="date-dd" id="wk-from-dd" placeholder="DD" min="1" max="31" style="width:52px">
+      <span class="date-sep">/</span>
+      <input type="number" class="date-mm" id="wk-from-mm" placeholder="MM" min="1" max="12" style="width:52px">
+      <span class="date-sep">/</span>
+      <input type="number" class="date-yyyy" id="wk-from-yyyy" placeholder="YYYY" min="2000" max="2100" style="width:76px">
     </div>
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">To</span>
+    <div class="date-fields">
+      <input type="number" class="date-dd" id="wk-to-dd" placeholder="DD" min="1" max="31" style="width:52px">
+      <span class="date-sep">/</span>
+      <input type="number" class="date-mm" id="wk-to-mm" placeholder="MM" min="1" max="12" style="width:52px">
+      <span class="date-sep">/</span>
+      <input type="number" class="date-yyyy" id="wk-to-yyyy" placeholder="YYYY" min="2000" max="2100" style="width:76px">
+    </div>
+    <button class="add-tag-btn" style="padding:8px 14px;font-size:12px" onclick="applyWeeklyRange()">Apply</button>
+    <button class="add-tag-btn" style="padding:8px 14px;font-size:12px;border-color:var(--border);color:var(--muted)" onclick="useDefaultWeek()">This Week</button>
+  </div>
+
+  <!-- MONTHLY: month + year dropdown -->
+  <div id="monthly-picker" style="display:none;margin-top:10px;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Month</span>
+    <select id="sel-month" onchange="applyMonthPicker()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;outline:none;cursor:pointer">
+      <option value="0">January</option><option value="1">February</option>
+      <option value="2">March</option><option value="3">April</option>
+      <option value="4">May</option><option value="5">June</option>
+      <option value="6">July</option><option value="7">August</option>
+      <option value="8">September</option><option value="9">October</option>
+      <option value="10">November</option><option value="11">December</option>
+    </select>
+    <select id="sel-month-year" onchange="applyMonthPicker()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;outline:none;cursor:pointer">
+    </select>
+  </div>
+
+  <!-- YEARLY: year dropdown -->
+  <div id="yearly-picker" style="display:none;margin-top:10px;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Year</span>
+    <select id="sel-year" onchange="applyYearPicker()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;outline:none;cursor:pointer">
+    </select>
+  </div>
+
+  <!-- CUSTOM DAYS: number input -->
+  <div id="custom-picker" style="display:none;margin-top:10px;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Last</span>
+    <input type="number" id="inp-custom-days" placeholder="e.g. 15" min="1" max="365"
+           style="width:90px;text-align:center;font-size:15px;font-weight:600;padding:9px 10px"
+           oninput="applyCustomDays()">
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Days</span>
+  </div>
+</div>
+    
+<!-- Date nav — hidden for custom pickers that manage their own range -->
+<div class="date-nav" id="date-nav-row">
+  <button class="nav-arrow" onclick="shiftPeriod(-1)">←</button>
+  <div class="date-label" id="date-label">—</div>
+  <button class="nav-arrow" onclick="shiftPeriod(1)">→</button>
+</div>
 
     <!-- Stats -->
     <div class="stats-grid">
@@ -766,38 +850,193 @@ function getActiveCatNames() {
 }
 
 // ══ ANALYTICS PERIOD ══════════════════════════════════════════════
+
+// Custom range state (used by weekly range picker and custom days)
+let customRangeStart = '';
+let customRangeEnd   = '';
+
 function setPeriod(p, btn) {
-  currentPeriod = p; periodOffset = 0;
+  currentPeriod = p;
+  periodOffset  = 0;
   document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
+
+  // Show/hide pickers and date-nav arrow row
+  const pickers   = ['weekly-picker','monthly-picker','yearly-picker','custom-picker'];
+  const dateNav   = document.getElementById('date-nav-row');
+  pickers.forEach(id => {
+    const el = document.getElementById(id);
+    el.style.display = 'none';
+  });
+
+  if (p === 'weekly') {
+    // Show weekly picker AND keep nav arrows (for default week fallback)
+    document.getElementById('weekly-picker').style.display = 'flex';
+    dateNav.style.display = 'flex';
+    useDefaultWeek(); // pre-fill with current week
+    return; // renderAnalytics called inside useDefaultWeek
+  }
+
+  if (p === 'monthly') {
+    document.getElementById('monthly-picker').style.display = 'flex';
+    dateNav.style.display = 'none';
+    populateMonthPicker();
+    applyMonthPicker();
+    return;
+  }
+
+  if (p === 'yearly') {
+    document.getElementById('yearly-picker').style.display = 'flex';
+    dateNav.style.display = 'none';
+    populateYearPicker();
+    applyYearPicker();
+    return;
+  }
+
+  if (p === 'custom') {
+    document.getElementById('custom-picker').style.display = 'flex';
+    dateNav.style.display = 'none';
+    // If there's already a value in the input, apply it; else show empty
+    const v = parseInt(document.getElementById('inp-custom-days').value);
+    if (v > 0) applyCustomDays();
+    else {
+      document.getElementById('date-label').textContent = 'Enter number of days';
+      // clear chart area gracefully
+      customRangeStart = ''; customRangeEnd = '';
+    }
+    return;
+  }
+
+  // Daily — standard arrows
+  dateNav.style.display = 'flex';
   renderAnalytics();
 }
-function shiftPeriod(dir) { periodOffset += dir; renderAnalytics(); }
 
-function getPeriodDates() {
-  const now = new Date(); let start, end, label;
-  if (currentPeriod === 'daily') {
-    const d = new Date(now); d.setDate(d.getDate() + periodOffset);
-    const s = d.toISOString().slice(0,10);
-    start = end = s; label = formatDate(s);
-  } else if (currentPeriod === 'weekly') {
-    const d = new Date(now); d.setDate(d.getDate() + periodOffset*7);
-    const mon = new Date(d); mon.setDate(d.getDate()-((d.getDay()+6)%7));
-    const sun = new Date(mon); sun.setDate(mon.getDate()+6);
-    start = mon.toISOString().slice(0,10); end = sun.toISOString().slice(0,10);
-    label = `${formatDate(start)} – ${formatDate(end)}`;
-  } else if (currentPeriod === 'monthly') {
-    const d = new Date(now.getFullYear(), now.getMonth()+periodOffset, 1);
-    start = d.toISOString().slice(0,10);
-    end   = new Date(d.getFullYear(), d.getMonth()+1, 0).toISOString().slice(0,10);
-    label = d.toLocaleDateString('en-IN', {month:'long', year:'numeric'});
-  } else {
-    const yr = now.getFullYear() + periodOffset;
-    start = `${yr}-01-01`; end = `${yr}-12-31`; label = String(yr);
-  }
-  return {start, end, label};
+function shiftPeriod(dir) {
+  periodOffset += dir;
+  renderAnalytics();
 }
 
+// ── Weekly range picker ────────────────────────────────────────────
+function useDefaultWeek() {
+  const now = new Date();
+  now.setDate(now.getDate() + periodOffset * 7);
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const pad = d => String(d).padStart(2,'0');
+
+  document.getElementById('wk-from-dd').value   = mon.getDate();
+  document.getElementById('wk-from-mm').value   = mon.getMonth()+1;
+  document.getElementById('wk-from-yyyy').value = mon.getFullYear();
+  document.getElementById('wk-to-dd').value     = sun.getDate();
+  document.getElementById('wk-to-mm').value     = sun.getMonth()+1;
+  document.getElementById('wk-to-yyyy').value   = sun.getFullYear();
+
+  customRangeStart = mon.toISOString().slice(0,10);
+  customRangeEnd   = sun.toISOString().slice(0,10);
+  renderAnalytics();
+}
+
+function applyWeeklyRange() {
+  const fdd = document.getElementById('wk-from-dd').value;
+  const fmm = document.getElementById('wk-from-mm').value;
+  const fyy = document.getElementById('wk-from-yyyy').value;
+  const tdd = document.getElementById('wk-to-dd').value;
+  const tmm = document.getElementById('wk-to-mm').value;
+  const tyy = document.getElementById('wk-to-yyyy').value;
+
+  if (!fdd||!fmm||!fyy||!tdd||!tmm||!tyy) return showToast('Fill in both dates');
+  const s = `${fyy}-${String(fmm).padStart(2,'0')}-${String(fdd).padStart(2,'0')}`;
+  const e = `${tyy}-${String(tmm).padStart(2,'0')}-${String(tdd).padStart(2,'0')}`;
+  if (s > e) return showToast('From date must be before To date');
+
+  customRangeStart = s;
+  customRangeEnd   = e;
+  renderAnalytics();
+}
+
+// ── Month picker ───────────────────────────────────────────────────
+function populateMonthPicker() {
+  const now      = new Date();
+  const yearSel  = document.getElementById('sel-month-year');
+  const monthSel = document.getElementById('sel-month');
+  yearSel.innerHTML = '';
+  for (let y = now.getFullYear(); y >= 2000; y--) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    yearSel.appendChild(opt);
+  }
+  monthSel.value = now.getMonth();
+  yearSel.value  = now.getFullYear();
+}
+
+function applyMonthPicker() {
+  const m   = parseInt(document.getElementById('sel-month').value);
+  const yr  = parseInt(document.getElementById('sel-month-year').value);
+  const s   = new Date(yr, m, 1).toISOString().slice(0,10);
+  const e   = new Date(yr, m+1, 0).toISOString().slice(0,10);
+  customRangeStart = s;
+  customRangeEnd   = e;
+  renderAnalytics();
+}
+
+// ── Year picker ────────────────────────────────────────────────────
+function populateYearPicker() {
+  const now    = new Date();
+  const sel    = document.getElementById('sel-year');
+  sel.innerHTML = '';
+  for (let y = now.getFullYear(); y >= 2000; y--) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    sel.appendChild(opt);
+  }
+  sel.value = now.getFullYear();
+}
+
+function applyYearPicker() {
+  const yr = parseInt(document.getElementById('sel-year').value);
+  customRangeStart = `${yr}-01-01`;
+  customRangeEnd   = `${yr}-12-31`;
+  renderAnalytics();
+}
+
+// ── Custom days ────────────────────────────────────────────────────
+function applyCustomDays() {
+  const days = parseInt(document.getElementById('inp-custom-days').value);
+  if (!days || days < 1) return;
+  const end   = new Date();
+  const start = new Date(); start.setDate(end.getDate() - (days - 1));
+  customRangeStart = start.toISOString().slice(0,10);
+  customRangeEnd   = end.toISOString().slice(0,10);
+  renderAnalytics();
+}
+
+// ── Core date calculator ───────────────────────────────────────────
+function getPeriodDates() {
+  const now = new Date();
+  let start, end, label;
+
+  // These periods now use customRangeStart/End set by their pickers
+  if (currentPeriod === 'weekly' || currentPeriod === 'monthly' ||
+      currentPeriod === 'yearly' || currentPeriod === 'custom') {
+    start = customRangeStart;
+    end   = customRangeEnd;
+    if (currentPeriod === 'custom') {
+      const days = document.getElementById('inp-custom-days').value;
+      label = days ? `Last ${days} days` : '—';
+    } else {
+      label = (start && end) ? `${formatDate(start)} – ${formatDate(end)}` : '—';
+    }
+    return {start, end, label};
+  }
+
+  // Daily — unchanged, uses periodOffset
+  const d = new Date(now); d.setDate(d.getDate() + periodOffset);
+  const s = d.toISOString().slice(0,10);
+  start = end = s;
+  label = formatDate(s);
+  return {start, end, label};
+}
 // ══ ANALYTICS RENDER ══════════════════════════════════════════════
 function renderAnalytics() {
   const {start, end, label} = getPeriodDates();
