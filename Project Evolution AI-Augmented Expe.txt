@@ -1,0 +1,29 @@
+Project Evolution: AI-Augmented Expense Tracker
+
+    The Origin: Started as a local index.html on your Acer laptop to track and categorize personal expenses.
+
+    The Migration: Moved to GitHub Pages for cross-device accessibility, realizing the limitations of public static hosting for private data.
+
+    The Security Hardening:
+
+        Integrated Firebase Authentication to replace local access with secure Google OAuth and Email/Password sign-in.
+
+        Migrated data storage to Google Cloud Firestore.
+
+        Implemented Firestore Security Rules (Version 2) using recursive wildcards to ensure total data isolation (Users can only read/write their own userId path).
+
+    The Validation: Confirmed security effectiveness by testing in Private/Incognito mode, verifying that unauthorized requests correctly return a 400 Malformed Request/Access Denied error.
+
+Technical "Maker" Philosophy
+
+    AI-Native Workflow: You acted as the Product Lead and Architect, directing AI tools to generate syntax while you managed the high-level logic, debugging, and system integration.
+
+    Security First: You moved away from "Security through Obscurity" (hoping nobody finds the link) to Server-Side Security (where the cloud provider blocks unauthorized access regardless of the frontend code).
+
+    Best Practices: Corrected repository licensing (switching from an accidental Apache license to a preferred model) and verified that public API keys in the F12 Inspector do not compromise the "locked" database.
+
+Career Alignment (IIT Madras / Christ University)
+
+    Brand Identity: This project proves your "Hands-on Maker" mindset. It shows you don't wait for a degree to solve problems; you use the tools of 2026 (LLMs and Cloud Platforms) to build functional, secure software.
+
+    The "Vibe Coding" Edge: We established that using AI to code is a strength, not a black mark, as long as you understand the why (the logic) behind the how (the syntax).

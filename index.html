@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Expense Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<link rel="stylesheet" href="css/dashboard-style.css">
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">Expense<span>Manager</span></div>
+    <div class="header-right">
+      <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">
+        <span class="theme-icon moon">🌙</span>
+        <span class="theme-icon sun">☀️</span>
+      </button>
+      <nav>
+        <button class="nav-btn active" onclick="switchView('add',this)">＋ Add</button>
+        <div class="nav-dropdown-wrap">
+          <button class="nav-btn" id="analytics-nav-btn" onclick="toggleAnalyticsMenu(event)">📊 Analytics ▾</button>
+          <div id="analytics-menu" class="nav-dropdown">
+            <button type="button" onclick="openAnalytics('expense',event)">Expense Analytics</button>
+            <button type="button" onclick="openAnalytics('income',event)">Income Analytics</button>
+          </div>
+        </div>
+        <button class="export-btn" onclick="openExportModal()">⬇ Export PDF</button>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ADD VIEW -->
+  <div class="view active" id="view-add">
+    <div class="add-layout">
+
+      <div class="card">
+        <div class="entry-type-row">
+          <button type="button" class="entry-type-btn active" id="btn-entry-expense" onclick="setEntryMode('expense')">Expense</button>
+          <button type="button" class="entry-type-btn" id="btn-entry-income" onclick="setEntryMode('income')">Income</button>
+        </div>
+        <div class="card-title" id="entry-form-title">New Expense</div>
+
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <div class="amount-wrap">
+            <span class="currency-sym">₹</span>
+            <input type="number" id="inp-amount" placeholder="0.00" min="0" step="0.01">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Date — DD / MM / YYYY</label>
+          <div class="date-fields">
+            <input type="number" class="date-dd" id="inp-dd" placeholder="DD" min="1" max="31">
+            <span class="date-sep">/</span>
+            <input type="number" class="date-mm" id="inp-mm" placeholder="MM" min="1" max="12">
+            <span class="date-sep">/</span>
+            <input type="number" class="date-yyyy" id="inp-yyyy" placeholder="YYYY" min="2000" max="2100">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Category &nbsp;<span class="label-hint">— × to delete · + to add</span></label>
+          <div class="cat-grid" id="cat-grid"></div>
+          <div class="inline-add-wrap" id="cat-add-wrap">
+            <input type="text" id="inp-newtag" placeholder="New category name..." maxlength="30">
+            <button class="inline-add-confirm" onclick="confirmAddCat()">Add</button>
+            <button class="inline-add-cancel" onclick="cancelAddCat()">✕</button>
+          </div>
+          <div class="subcat-wrap" id="subcat-wrap">
+            <div class="subcat-hint">Optional — pick a subcategory</div>
+            <div class="subcat-grid" id="subcat-grid"></div>
+            <div class="inline-add-wrap" id="subcat-add-wrap" style="margin-top:6px;">
+              <input type="text" id="inp-newsubcat" placeholder="New subcategory..." maxlength="30">
+              <button class="inline-add-confirm" onclick="confirmAddSubcat()">Add</button>
+              <button class="inline-add-cancel" onclick="cancelAddSubcat()">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" id="pay-group">
+          <label>Mode of Payment &nbsp;<span class="label-hint">— multiple allowed</span></label>
+          <div class="pay-grid" id="pay-grid">
+            <button class="pay-pill" data-pay="Cash" onclick="togglePay(this)">💵 Cash</button>
+            <button class="pay-pill" data-pay="UPI" onclick="togglePay(this)">📱 UPI</button>
+            <button class="pay-pill" data-pay="Credit Card" onclick="togglePay(this)">💳 Credit Card</button>
+            <button class="pay-pill" data-pay="Debit Card" onclick="togglePay(this)">🏧 Debit Card</button>
+            <button class="pay-pill" data-pay="Cheque" onclick="togglePay(this)">📄 Cheque</button>
+            <button class="pay-pill" data-pay="DD" onclick="togglePay(this)">🏦 DD</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Note (optional)</label>
+          <input type="text" id="inp-note" placeholder="What was this for?">
+        </div>
+
+        <button class="submit-btn" id="submit-entry-btn" onclick="addEntry()">Add Expense</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recent Activity</div>
+        <div class="recent-list" id="recent-list">
+          <div class="empty-state"><div class="empty-icon">📋</div><br>No entries yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS VIEW -->
+  <div class="view" id="view-analytics">
+    <div class="analytics-top">
+      <div class="analytics-title" id="analytics-title">Expense Analytics</div>
+    </div>
+
+    <div class="net-summary-card">
+      <div class="chart-title">Net Summary — This Period</div>
+      <div class="net-summary-grid">
+        <div class="net-stat"><div class="net-stat-label">Total Income</div><div class="net-stat-value positive" id="net-total-income">₹0</div></div>
+        <div class="net-stat"><div class="net-stat-label">Total Expenses</div><div class="net-stat-value negative" id="net-total-expense">₹0</div></div>
+        <div class="net-stat"><div class="net-stat-label">Net Balance</div><div class="net-stat-value neutral" id="net-balance">₹0</div></div>
+      </div>
+    </div>
+
+    <div class="filter-panel">
+      <div class="filter-group" style="width:100%">
+        <div class="filter-label">Period</div>
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setPeriod('daily',this)">Daily</button>
+          <button class="period-tab" onclick="setPeriod('weekly',this)">Weekly</button>
+          <button class="period-tab" onclick="setPeriod('monthly',this)">Monthly</button>
+          <button class="period-tab" onclick="setPeriod('yearly',this)">Yearly</button>
+          <button class="period-tab" onclick="setPeriod('custom',this)">Custom Days</button>
+        </div>
+
+        <div id="weekly-picker" style="display:none">
+          <span>From</span>
+          <div class="date-fields">
+            <input type="number" class="date-dd" id="wk-from-dd" placeholder="DD" min="1" max="31" style="width:52px">
+            <span class="date-sep">/</span>
+            <input type="number" class="date-mm" id="wk-from-mm" placeholder="MM" min="1" max="12" style="width:52px">
+            <span class="date-sep">/</span>
+            <input type="number" class="date-yyyy" id="wk-from-yyyy" placeholder="YYYY" min="2000" max="2100" style="width:76px">
+          </div>
+          <span>To</span>
+          <div class="date-fields">
+            <input type="number" class="date-dd" id="wk-to-dd" placeholder="DD" min="1" max="31" style="width:52px">
+            <span class="date-sep">/</span>
+            <input type="number" class="date-mm" id="wk-to-mm" placeholder="MM" min="1" max="12" style="width:52px">
+            <span class="date-sep">/</span>
+            <input type="number" class="date-yyyy" id="wk-to-yyyy" placeholder="YYYY" min="2000" max="2100" style="width:76px">
+          </div>
+          <button class="picker-btn" onclick="applyWeeklyRange()">Apply</button>
+          <button class="picker-btn muted" onclick="useDefaultWeek()">This Week</button>
+        </div>
+
+        <div id="monthly-picker" style="display:none">
+          <span>Month</span>
+          <select id="sel-month" onchange="applyMonthPicker()">
+            <option value="0">January</option><option value="1">February</option>
+            <option value="2">March</option><option value="3">April</option>
+            <option value="4">May</option><option value="5">June</option>
+            <option value="6">July</option><option value="7">August</option>
+            <option value="8">September</option><option value="9">October</option>
+            <option value="10">November</option><option value="11">December</option>
+          </select>
+          <select id="sel-month-year" onchange="applyMonthPicker()"></select>
+        </div>
+
+        <div id="yearly-picker" style="display:none">
+          <span>Year</span>
+          <select id="sel-year" onchange="applyYearPicker()"></select>
+        </div>
+
+        <div id="custom-picker" style="display:none">
+          <span>Last</span>
+          <input type="number" id="inp-custom-days" placeholder="e.g. 15" min="1" max="365" style="width:90px;text-align:center;font-size:15px;font-weight:600;padding:9px 10px" oninput="applyCustomDays()">
+          <span>Days</span>
+        </div>
+      </div>
+
+      <div class="filter-group" style="flex:1;min-width:200px">
+        <div class="filter-label">Categories &nbsp;<span class="label-hint-inline">(tap to select · multiple allowed)</span></div>
+        <div class="cat-filter-row" id="cat-filter-row"></div>
+        <div class="subcat-filter-row" id="subcat-filter-row" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="date-nav" id="date-nav-row">
+      <button class="nav-arrow" onclick="shiftPeriod(-1)">←</button>
+      <div class="date-label" id="date-label">—</div>
+      <button class="nav-arrow" onclick="shiftPeriod(1)">→</button>
+    </div>
+
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-label" id="stat-total-label">Total Spent</div><div class="stat-value" id="stat-total">₹0</div><div class="stat-sub">Selected period</div></div>
+      <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value" id="stat-count">0</div><div class="stat-sub">Entries</div></div>
+      <div class="stat-card"><div class="stat-label">Avg / Entry</div><div class="stat-value" id="stat-avg">₹0</div><div class="stat-sub" id="stat-avg-sub">Average</div></div>
+      <div class="stat-card"><div class="stat-label">Top Category</div><div class="stat-value" id="stat-top" style="font-size:17px">—</div><div class="stat-sub" id="stat-top-amt"></div></div>
+    </div>
+
+    <div class="charts-layout">
+      <div class="chart-card"><div class="chart-title" id="pie-chart-title">Category Share</div><canvas id="pie-chart"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Breakdown</div><div id="breakdown-list"></div></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title" id="trend-title">Trend</div>
+      <div id="trend-wrap" style="overflow-x:auto"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="export-modal">
+  <div class="modal">
+    <div class="modal-title">⬇ Export to PDF</div>
+    <div class="export-type-row">
+      <button type="button" class="export-type-btn active" id="export-type-expense" onclick="setExportType('expense')">Expense Report</button>
+      <button type="button" class="export-type-btn" id="export-type-income" onclick="setExportType('income')">Income Report</button>
+    </div>
+    <div class="modal-group">
+      <label>From Date — DD / MM / YYYY</label>
+      <div class="modal-row date-fields">
+        <input type="number" id="exp-from-dd" class="date-dd" placeholder="DD" min="1" max="31">
+        <span class="date-sep">/</span>
+        <input type="number" id="exp-from-mm" class="date-mm" placeholder="MM" min="1" max="12">
+        <span class="date-sep">/</span>
+        <input type="number" id="exp-from-yyyy" class="date-yyyy" placeholder="YYYY" min="2000" max="2100">
+      </div>
+    </div>
+    <div class="modal-group">
+      <label>To Date — DD / MM / YYYY</label>
+      <div class="modal-row date-fields">
+        <input type="number" id="exp-to-dd" class="date-dd" placeholder="DD" min="1" max="31">
+        <span class="date-sep">/</span>
+        <input type="number" id="exp-to-mm" class="date-mm" placeholder="MM" min="1" max="12">
+        <span class="date-sep">/</span>
+        <input type="number" id="exp-to-yyyy" class="date-yyyy" placeholder="YYYY" min="2000" max="2100">
+      </div>
+    </div>
+    <div class="modal-group">
+      <label>Categories to include</label>
+      <div id="exp-cat-filter" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeExportModal()">Cancel</button>
+      <button class="modal-export" onclick="runExportPDF()">Generate PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/dashboard-script.js"></script>
+</body>
+</html>
