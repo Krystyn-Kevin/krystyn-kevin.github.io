@@ -15,7 +15,6 @@
 <body>
 <div class="app">
 
-  <!-- HEADER -->
   <header>
     <div class="logo">Expense<span>Manager</span></div>
     <div class="header-right">
@@ -26,19 +25,28 @@
       <nav>
         <button class="nav-btn active" onclick="switchView('add',this)">＋ Add</button>
         <button class="nav-btn"        onclick="switchView('analytics',this)">📊 Analytics</button>
-        <button class="nav-btn bank-nav" onclick="switchView('bank',this)">🏦 Bank</button>
+        <button class="nav-btn"        onclick="openRecentModal()">🕒 Recent Expenses</button>
         <button class="export-btn"     onclick="openExportModal()">⬇ Export PDF</button>
         <button class="logout-btn"     onclick="logout()">Logout</button>
       </nav>
     </div>
   </header>
 
-  <!-- ══ ADD EXPENSE VIEW ══ -->
   <div class="view active" id="view-add">
     <div class="add-layout">
 
       <div class="card">
         <div class="card-title">New Expense</div>
+
+        <div class="form-group">
+          <label>Account</label>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <select id="inp-account" style="flex:1;">
+              <option value="">Select account...</option>
+            </select>
+            <button class="nav-btn" style="padding:10px 14px;border-radius:10px" onclick="openAccModal()">Manage</button>
+          </div>
+        </div>
 
         <div class="form-group">
           <label>Amount (₹)</label>
@@ -98,92 +106,8 @@
         <button class="submit-btn" onclick="addExpense()">Add Expense</button>
       </div>
 
-      <div class="card">
-        <div class="card-title">Recent Expenses</div>
-        <div class="recent-list" id="recent-list">
-          <div class="empty-state"><div class="empty-icon">📋</div>No expenses yet.<br>Add your first one!</div>
-        </div>
-      </div>
     </div>
-  </div><!-- /view-add -->
-
-  <!-- ══ BANK VIEW ══ -->
-  <div class="view" id="view-bank">
-    <div class="bank-layout">
-
-      <div class="card">
-        <div class="card-title">Record Bank Transaction</div>
-
-        <div class="bank-type-row">
-          <button class="bank-type-btn" id="bank-btn-w" onclick="selectBankType('withdrawal')">⬇ Withdrawal</button>
-          <button class="bank-type-btn" id="bank-btn-d" onclick="selectBankType('deposit')">⬆ Deposit</button>
-        </div>
-
-        <div class="form-group">
-          <label>Bank</label>
-          <select class="bank-select" id="inp-bank">
-            <option value="">Select bank...</option>
-            <option>SBI</option><option>HDFC</option><option>ICICI</option>
-            <option>Axis Bank</option><option>Canara Bank</option>
-            <option>Indian Bank</option><option>Bank of Baroda</option>
-            <option>Kotak Mahindra</option><option>PNB</option>
-            <option>Union Bank</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Amount (₹)</label>
-          <div class="amount-wrap">
-            <span class="currency-sym">₹</span>
-            <input type="number" id="inp-bank-amount" placeholder="0.00" min="0" step="0.01">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Date — DD / MM / YYYY</label>
-          <div class="date-fields">
-            <input type="number" class="date-dd"   id="inp-bank-dd"   placeholder="DD"   min="1" max="31">
-            <span class="date-sep">/</span>
-            <input type="number" class="date-mm"   id="inp-bank-mm"   placeholder="MM"   min="1" max="12">
-            <span class="date-sep">/</span>
-            <input type="number" class="date-yyyy" id="inp-bank-yyyy" placeholder="YYYY" min="2000" max="2100">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Note (optional)</label>
-          <input type="text" id="inp-bank-note" placeholder="e.g. salary credit, ATM withdrawal...">
-        </div>
-
-        <button class="bank-submit-btn" id="bank-submit-btn" onclick="addBankTxn()">Record Transaction</button>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Bank Transactions</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;">
-          <div style="text-align:center;padding:12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
-            <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">Deposits</div>
-            <div style="font-family:'Sora',sans-serif;font-size:18px;font-weight:800;color:#5af5c8;" id="bv-total-dep">₹0</div>
-          </div>
-          <div style="text-align:center;padding:12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
-            <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">Withdrawals</div>
-            <div style="font-family:'Sora',sans-serif;font-size:18px;font-weight:800;color:#f55a8c;" id="bv-total-wdl">₹0</div>
-          </div>
-          <div style="text-align:center;padding:12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
-            <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">Net</div>
-            <div style="font-family:'Sora',sans-serif;font-size:18px;font-weight:800;" id="bv-net">₹0</div>
-          </div>
-        </div>
-        <div class="bank-txn-list-full" id="bank-txn-list-full">
-          <div class="empty-state"><div class="empty-icon">🏦</div>No transactions yet.</div>
-        </div>
-      </div>
-
-    </div>
-  </div><!-- /view-bank -->
-
-  <!-- ══ ANALYTICS VIEW ══ -->
-  <div class="view" id="view-analytics">
+  </div><div class="view" id="view-analytics">
     <div class="analytics-top">
       <div class="analytics-title">Analytics</div>
     </div>
@@ -265,7 +189,6 @@
       <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value" id="stat-count">0</div><div class="stat-sub">Entries</div></div>
       <div class="stat-card"><div class="stat-label">Avg / Entry</div><div class="stat-value" id="stat-avg">₹0</div><div class="stat-sub">Average expense</div></div>
       <div class="stat-card"><div class="stat-label">Top Category</div><div class="stat-value" id="stat-top" style="font-size:17px">—</div><div class="stat-sub" id="stat-top-amt"></div></div>
-      <div class="stat-card"><div class="stat-label">Net Bank Balance</div><div class="stat-value" id="stat-net-bank" style="font-size:22px">₹0</div><div class="stat-sub">Deposits − Withdrawals</div></div>
     </div>
 
     <div class="charts-layout">
@@ -278,20 +201,51 @@
       <div id="trend-wrap" style="overflow-x:auto"></div>
     </div>
 
-    <div class="bank-summary-card">
-      <div class="chart-title">Bank Summary — This Period</div>
-      <div class="bank-summary-grid">
-        <div class="bank-stat"><div class="bank-stat-label">Total Deposits</div><div class="bank-stat-value positive" id="bank-total-dep">₹0</div></div>
-        <div class="bank-stat"><div class="bank-stat-label">Total Withdrawals</div><div class="bank-stat-value negative" id="bank-total-wdl">₹0</div></div>
-        <div class="bank-stat"><div class="bank-stat-label">Net Balance</div><div class="bank-stat-value neutral" id="bank-net">₹0</div></div>
+  </div></div><div class="modal-overlay" id="acc-modal">
+  <div class="modal">
+    <div class="modal-title">Manage Accounts</div>
+    
+    <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border);margin-bottom:20px;">
+      <div class="modal-group">
+        <label>Display Name (Shown in Menu)</label>
+        <input type="text" id="acc-name" placeholder="e.g. HDFC Personal">
       </div>
+      <div class="modal-group">
+        <label>Account Holder Name</label>
+        <input type="text" id="acc-holder" placeholder="e.g. John Doe">
+      </div>
+      <div class="modal-group">
+        <label>Account Number</label>
+        <input type="text" id="acc-num" placeholder="e.g. 1234567890">
+      </div>
+      <button class="submit-btn" style="padding:10px;font-size:13px;margin-top:0" onclick="addAccount()">Add Account</button>
     </div>
 
-  </div><!-- /view-analytics -->
+    <div class="modal-group">
+      <label>Saved Accounts</label>
+      <div id="acc-list" style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+    
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeAccModal()">Done</button>
+    </div>
+  </div>
+</div>
 
-</div><!-- /app -->
+<div class="modal-overlay" id="recent-modal">
+  <div class="modal" style="max-width:550px">
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>🕒 Recent Expenses</span>
+      <button class="logout-btn" style="padding:6px 12px;font-size:12px;" onclick="deleteSelectedExpenses()">Trash Selected</button>
+    </div>
+    <div class="recent-list" id="modal-recent-list" style="max-height:400px;overflow-y:auto;">
+      </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeRecentModal()">Close</button>
+    </div>
+  </div>
+</div>
 
-<!-- PDF EXPORT MODAL -->
 <div class="modal-overlay" id="export-modal">
   <div class="modal">
     <div class="modal-title">⬇ Export Expenses to PDF</div>
