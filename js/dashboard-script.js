@@ -10,7 +10,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(), db=firebase.firestore();
 
-const S_CATS='spendex_cats_v3', S_SUBCATS='spendex_subcats_v1', S_THEME='spendex_theme';
+const S_CATS='spendex_cats_v3', S_SUBCATS='spendex_subcats_v1', S_THEME='spendex_theme', S_ACCOUNTS='spendex_accounts_v1';
 
 // ══ DEFAULT CATEGORIES & SUBCATEGORIES ════════════════════════════
 const DEFAULTS=[
@@ -23,7 +23,6 @@ const DEFAULTS=[
 ];
 const CUSTOM_PALETTE=['#c8f55a','#5af5f5','#f5a05a','#a05af5','#f55af5','#5af5a0','#f5d05a'];
 
-// Default subcats — stored separately so user additions persist
 const DEFAULT_SUBCATS={
   'Food':['Breakfast','Lunch','Dinner','Snacks','Beverages','Groceries'],
   'Entertainment':['Movies','OTT/Streaming','Gaming','Events/Concerts','Sports','Theatre','Music','Amusement Park'],
@@ -35,11 +34,9 @@ const DEFAULT_SUBCATS={
 
 // ══ STATE ═════════════════════════════════════════════════════════
 let expenses        = [];
-let banktxns        = [];
+let accounts        = JSON.parse(localStorage.getItem(S_ACCOUNTS)||'[]');
 let cats            = JSON.parse(localStorage.getItem(S_CATS)||'null')||DEFAULTS.map(d=>({...d}));
-// subcats: object { catName: [sub1, sub2, ...] } — user can add to any category
-let subcats         = JSON.parse(localStorage.getItem(S_SUBCATS)||'null') ||
-                      Object.fromEntries(Object.entries(DEFAULT_SUBCATS).map(([k,v])=>[k,[...v]]));
+let subcats         = JSON.parse(localStorage.getItem(S_SUBCATS)||'null') || Object.fromEntries(Object.entries(DEFAULT_SUBCATS).map(([k,v])=>[k,[...v]]));
 
 let selectedCat     = '';
 let selectedSubcat  = '';
@@ -51,12 +48,12 @@ let periodOffset    = 0;
 let pieChart        = null;
 let currentView     = 'add';
 let expSelCats      = new Set(['__ALL__']);
-let bankTxnType     = '';
 let customRangeStart= '';
 let customRangeEnd  = '';
 
 function saveCats()   { localStorage.setItem(S_CATS,JSON.stringify(cats)); }
 function saveSubcats(){ localStorage.setItem(S_SUBCATS,JSON.stringify(subcats)); }
+function saveAccounts(){ localStorage.setItem(S_ACCOUNTS,JSON.stringify(accounts)); renderAccounts(); }
 function getCatColor(n){ const c=cats.find(c=>c.name===n); return c?c.color:'#c8f55a'; }
 function getCatIcon(n) { const c=cats.find(c=>c.name===n); return c?c.icon:'🏷'; }
 function formatDate(iso){ const[y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
@@ -70,24 +67,17 @@ auth.onAuthStateChanged(user=>{
   document.body.style.display='block';
   const n=new Date();
   ['inp-dd','inp-mm','inp-yyyy'].forEach((id,i)=>document.getElementById(id).value=[n.getDate(),n.getMonth()+1,n.getFullYear()][i]);
-  ['inp-bank-dd','inp-bank-mm','inp-bank-yyyy'].forEach((id,i)=>document.getElementById(id).value=[n.getDate(),n.getMonth()+1,n.getFullYear()][i]);
+  
   renderCatGrid();
+  renderAccounts();
   listenForExpenses(user.uid);
-  listenForBankTxns(user.uid);
 });
 
 function listenForExpenses(uid){
   db.collection('users').doc(uid).collection('expenses').orderBy('timestamp','desc').onSnapshot(snap=>{
     expenses=snap.docs.map(doc=>({id:doc.id,...doc.data()}));
-    renderRecent();
+    renderRecentModalList();
     if(currentView==='analytics') renderAnalytics();
-  });
-}
-function listenForBankTxns(uid){
-  db.collection('users').doc(uid).collection('banktxns').orderBy('timestamp','desc').onSnapshot(snap=>{
-    banktxns=snap.docs.map(doc=>({id:doc.id,...doc.data()}));
-    if(currentView==='analytics') renderBankSummary();
-    if(currentView==='bank') renderBankView();
   });
 }
 
@@ -106,10 +96,67 @@ function switchView(v,btn){
   document.getElementById('view-'+v).classList.add('active');
   btn.classList.add('active');
   if(v==='analytics'){ renderCatFilterRow(); renderAnalytics(); }
-  if(v==='bank') renderBankView();
 }
 
-// ══ CATEGORY GRID — inline + button ══════════════════════════════
+// ══ ACCOUNTS (ADD / REMOVE) ═══════════════════════════════════════
+function openAccModal() { document.getElementById('acc-modal').classList.add('open'); }
+function closeAccModal() { 
+  document.getElementById('acc-modal').classList.remove('open');
+  document.getElementById('acc-name').value='';
+  document.getElementById('acc-holder').value='';
+  document.getElementById('acc-num').value='';
+}
+document.getElementById('acc-modal').addEventListener('click',function(e){if(e.target===this)closeAccModal();});
+
+function renderAccounts() {
+  const sel = document.getElementById('inp-account');
+  const list = document.getElementById('acc-list');
+  
+  // Update Dropdown
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="">Select account...</option>' + accounts.map(a => `<option value="${a.id}">${a.dispName}</option>`).join('');
+  if (accounts.some(a => a.id === prevVal)) sel.value = prevVal;
+
+  // Update List in Manage Modal
+  if(!accounts.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px;">No accounts saved yet.</div>';
+  } else {
+    list.innerHTML = accounts.map(a => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${a.dispName}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${a.holderName} · ${a.accNum}</div>
+        </div>
+        <button class="pill-x" onclick="deleteAccount('${a.id}')" style="width:22px;height:22px;font-size:14px;">×</button>
+      </div>
+    `).join('');
+  }
+}
+
+function addAccount() {
+  const dispName = document.getElementById('acc-name').value.trim();
+  const holderName = document.getElementById('acc-holder').value.trim();
+  const accNum = document.getElementById('acc-num').value.trim();
+  
+  if(!dispName || !holderName || !accNum) return showToast('Fill all account details');
+  
+  accounts.push({ id: 'acc_' + Date.now(), dispName, holderName, accNum });
+  saveAccounts();
+  showToast('Account added');
+  
+  document.getElementById('acc-name').value='';
+  document.getElementById('acc-holder').value='';
+  document.getElementById('acc-num').value='';
+}
+
+function deleteAccount(id) {
+  if(!confirm('Delete this account?')) return;
+  accounts = accounts.filter(a => a.id !== id);
+  saveAccounts();
+  showToast('Account deleted');
+}
+
+// ══ CATEGORY GRID ═════════════════════════════════════════════════
 function renderCatGrid(){
   const grid=document.getElementById('cat-grid');
   let html=cats.map(c=>{
@@ -121,94 +168,48 @@ function renderCatGrid(){
       <button class="pill-x" title="Delete" onclick="event.stopPropagation();deleteTag('${safe}')">×</button>
     </button>`;
   }).join('');
-  // + button at end
   html+=`<button class="add-pill-btn" title="Add category" onclick="showAddCat()">+</button>`;
   grid.innerHTML=html;
   renderSubcatGrid();
 }
 
-function selectCat(btn){
-  selectedCat=btn.dataset.cat; selectedSubcat='';
-  renderCatGrid();
-}
-
-// ── Inline add category ──
-function showAddCat(){
-  document.getElementById('cat-add-wrap').classList.add('visible');
-  document.getElementById('inp-newtag').value='';
-  document.getElementById('inp-newtag').focus();
-}
+function selectCat(btn){ selectedCat=btn.dataset.cat; selectedSubcat=''; renderCatGrid(); }
+function showAddCat(){ document.getElementById('cat-add-wrap').classList.add('visible'); document.getElementById('inp-newtag').value=''; document.getElementById('inp-newtag').focus(); }
 function cancelAddCat(){ document.getElementById('cat-add-wrap').classList.remove('visible'); }
 function confirmAddCat(){
-  const inp=document.getElementById('inp-newtag');
-  const name=inp.value.trim();
+  const inp=document.getElementById('inp-newtag'), name=inp.value.trim();
   if(!name) return showToast('Enter a category name');
   if(cats.some(c=>c.name.toLowerCase()===name.toLowerCase())) return showToast('Already exists');
-  const color=CUSTOM_PALETTE[cats.length%CUSTOM_PALETTE.length];
-  cats.push({name,icon:'🏷',color});
-  saveCats();
-  cancelAddCat();
-  selectedCat=name; selectedSubcat='';
-  renderCatGrid();
-  renderCatFilterRow();
-  showToast(`"${name}" added`);
+  cats.push({name,icon:'🏷',color:CUSTOM_PALETTE[cats.length%CUSTOM_PALETTE.length]});
+  saveCats(); cancelAddCat(); selectedCat=name; selectedSubcat=''; renderCatGrid(); renderCatFilterRow(); showToast(`"${name}" added`);
 }
-// confirm on Enter
 document.getElementById('inp-newtag').addEventListener('keydown',e=>{ if(e.key==='Enter') confirmAddCat(); if(e.key==='Escape') cancelAddCat(); });
-
 function deleteTag(name){
   if(!confirm(`Delete "${name}"?\nExpenses already saved won't be affected.`)) return;
-  cats=cats.filter(c=>c.name!==name);
-  delete subcats[name];
-  saveCats(); saveSubcats();
+  cats=cats.filter(c=>c.name!==name); delete subcats[name]; saveCats(); saveSubcats();
   if(selectedCat===name){ selectedCat=''; selectedSubcat=''; }
-  selCatFilters.delete(name);
-  renderCatGrid(); renderCatFilterRow();
-  if(currentView==='analytics') renderAnalytics();
-  showToast(`"${name}" deleted`);
+  selCatFilters.delete(name); renderCatGrid(); renderCatFilterRow(); if(currentView==='analytics') renderAnalytics(); showToast(`"${name}" deleted`);
 }
 
-// ══ SUBCATEGORY GRID — inline + button ═══════════════════════════
+// ══ SUBCATEGORY GRID ══════════════════════════════════════════════
 function renderSubcatGrid(){
-  const wrap=document.getElementById('subcat-wrap');
-  const grid=document.getElementById('subcat-grid');
-  const subs=getSubcats(selectedCat);
+  const wrap=document.getElementById('subcat-wrap'), grid=document.getElementById('subcat-grid'), subs=getSubcats(selectedCat);
   if(!selectedCat){ wrap.classList.remove('open'); return; }
   wrap.classList.add('open');
   const color=getCatColor(selectedCat);
-  let html=subs.map(s=>`
-    <button class="subcat-pill${selectedSubcat===s?' selected':''}" data-sub="${s}"
-      style="${selectedSubcat===s?`background:${color};border-color:${color}`:''}"
-      onclick="selectSubcat(this)">${s}</button>`).join('');
-  // + at end of subcats
+  let html=subs.map(s=>`<button class="subcat-pill${selectedSubcat===s?' selected':''}" data-sub="${s}" style="${selectedSubcat===s?`background:${color};border-color:${color}`:''}" onclick="selectSubcat(this)">${s}</button>`).join('');
   html+=`<button class="add-pill-btn" title="Add subcategory" onclick="showAddSubcat()" style="width:24px;height:24px;font-size:14px;">+</button>`;
   grid.innerHTML=html;
 }
-
-function selectSubcat(btn){
-  selectedSubcat=selectedSubcat===btn.dataset.sub?'':btn.dataset.sub;
-  renderSubcatGrid();
-}
-
-// ── Inline add subcategory ──
-function showAddSubcat(){
-  document.getElementById('subcat-add-wrap').classList.add('visible');
-  document.getElementById('inp-newsubcat').value='';
-  document.getElementById('inp-newsubcat').focus();
-}
+function selectSubcat(btn){ selectedSubcat=selectedSubcat===btn.dataset.sub?'':btn.dataset.sub; renderSubcatGrid(); }
+function showAddSubcat(){ document.getElementById('subcat-add-wrap').classList.add('visible'); document.getElementById('inp-newsubcat').value=''; document.getElementById('inp-newsubcat').focus(); }
 function cancelAddSubcat(){ document.getElementById('subcat-add-wrap').classList.remove('visible'); }
 function confirmAddSubcat(){
-  const inp=document.getElementById('inp-newsubcat');
-  const name=inp.value.trim();
+  const name=document.getElementById('inp-newsubcat').value.trim();
   if(!name||!selectedCat) return showToast('Select a category first');
   if(!subcats[selectedCat]) subcats[selectedCat]=[];
   if(subcats[selectedCat].includes(name)) return showToast('Already exists');
-  subcats[selectedCat].push(name);
-  saveSubcats();
-  cancelAddSubcat();
-  selectedSubcat=name;
-  renderSubcatGrid();
-  showToast(`"${name}" added to ${selectedCat}`);
+  subcats[selectedCat].push(name); saveSubcats(); cancelAddSubcat(); selectedSubcat=name; renderSubcatGrid(); showToast(`"${name}" added to ${selectedCat}`);
 }
 document.getElementById('inp-newsubcat').addEventListener('keydown',e=>{ if(e.key==='Enter') confirmAddSubcat(); if(e.key==='Escape') cancelAddSubcat(); });
 
@@ -222,15 +223,24 @@ function togglePay(btn){
 // ══ ADD EXPENSE ════════════════════════════════════════════════════
 function addExpense(){
   const amount=parseFloat(document.getElementById('inp-amount').value);
+  const account=document.getElementById('inp-account').value;
   const dd=document.getElementById('inp-dd').value, mm=document.getElementById('inp-mm').value, yyyy=document.getElementById('inp-yyyy').value;
   const note=document.getElementById('inp-note').value.trim();
   const user=auth.currentUser;
+  
+  if(!account)             return showToast('Select an account');
   if(!amount||amount<=0) return showToast('Enter a valid amount');
   if(!dd||!mm||!yyyy)    return showToast('Enter a valid date');
-  if(!selectedCat)        return showToast('Select a category');
+  if(!selectedCat)       return showToast('Select a category');
+  
+  const accDetails = accounts.find(a => a.id === account);
+  const accName = accDetails ? accDetails.dispName : account;
+
   const date=`${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+  
   db.collection('users').doc(user.uid).collection('expenses').add({
     amount,date,cat:selectedCat,subcat:selectedSubcat||'',payModes:[...selectedPays],note,
+    account: accName,
     timestamp:firebase.firestore.FieldValue.serverTimestamp()
   }).then(()=>{
     showToast('Saved!');
@@ -242,101 +252,51 @@ function addExpense(){
   }).catch(()=>showToast('Save failed — check connection'));
 }
 
-function delExpense(id){
-  if(!confirm('Delete this entry?')) return;
-  db.collection('users').doc(auth.currentUser.uid).collection('expenses').doc(id).delete()
-    .then(()=>showToast('Deleted')).catch(()=>showToast('Delete failed'));
-}
+// ══ RECENT EXPENSES MODAL & BULK DELETE ══════════════════════════
+function openRecentModal() { document.getElementById('recent-modal').classList.add('open'); }
+function closeRecentModal() { document.getElementById('recent-modal').classList.remove('open'); }
+document.getElementById('recent-modal').addEventListener('click',function(e){if(e.target===this)closeRecentModal();});
 
-// ══ RECENT LIST ════════════════════════════════════════════════════
-function renderRecent(){
-  const list=document.getElementById('recent-list');
-  if(!expenses.length){ list.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div>No expenses yet.<br>Add your first one!</div>'; return; }
-  list.innerHTML=expenses.slice(0,30).map(e=>{
+function renderRecentModalList(){
+  const list=document.getElementById('modal-recent-list');
+  if(!expenses.length){ 
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div>No expenses yet.</div>'; 
+    return; 
+  }
+  
+  list.innerHTML = expenses.map(e=>{
     const pays=(e.payModes&&e.payModes.length)?e.payModes.join(' · '):'';
-    return `<div class="expense-item">
-      <div class="exp-dot" style="background:${getCatColor(e.cat)}"></div>
+    const accLabel=e.account ? ` · 🏦 ${e.account}` : '';
+    
+    return `
+    <div class="expense-item" style="cursor:default">
+      <input type="checkbox" class="exp-check" value="${e.id}" style="width:18px;height:18px;accent-color:var(--danger);cursor:pointer;flex-shrink:0;">
+      <div class="exp-dot" style="background:${getCatColor(e.cat)};margin-left:6px;"></div>
       <div class="exp-info">
         <div class="exp-cat">${e.cat}${e.subcat?' › '+e.subcat:''}</div>
         ${e.note?`<div class="exp-note">${e.note}</div>`:''}
-        <div class="exp-date">${e.date?formatDate(e.date):''}${pays?' &nbsp;·&nbsp; '+pays:''}</div>
+        <div class="exp-date">${e.date?formatDate(e.date):''}${pays?' &nbsp;·&nbsp; '+pays:''}${accLabel}</div>
       </div>
       <div class="exp-amount">₹${Number(e.amount).toLocaleString('en-IN')}</div>
-      <button class="exp-del" onclick="delExpense('${e.id}')">×</button>
     </div>`;
   }).join('');
 }
 
-// ══ BANK VIEW ══════════════════════════════════════════════════════
-function selectBankType(type){
-  bankTxnType=type;
-  document.getElementById('bank-btn-w').className='bank-type-btn'+(type==='withdrawal'?' selected-w':'');
-  document.getElementById('bank-btn-d').className='bank-type-btn'+(type==='deposit'?' selected-d':'');
-  const btn=document.getElementById('bank-submit-btn');
-  btn.style.background=type==='withdrawal'?'#f55a8c':'#5af5c8';
-  btn.style.color=type==='withdrawal'?'#fff':'#0c0c0f';
-  btn.style.border='none';
+function deleteSelectedExpenses() {
+  const checkboxes = document.querySelectorAll('.exp-check:checked');
+  if(checkboxes.length === 0) return showToast('Select at least one expense');
+  if(!confirm(`Trash ${checkboxes.length} selected expense(s)?`)) return;
+  
+  const user = auth.currentUser;
+  const promises = Array.from(checkboxes).map(cb => {
+    return db.collection('users').doc(user.uid).collection('expenses').doc(cb.value).delete();
+  });
+  
+  Promise.all(promises).then(() => {
+    showToast(`${checkboxes.length} expense(s) deleted`);
+  }).catch(() => showToast('Failed to delete some expenses'));
 }
 
-function addBankTxn(){
-  const amount=parseFloat(document.getElementById('inp-bank-amount').value);
-  const bank=document.getElementById('inp-bank').value;
-  const dd=document.getElementById('inp-bank-dd').value, mm=document.getElementById('inp-bank-mm').value, yyyy=document.getElementById('inp-bank-yyyy').value;
-  const note=document.getElementById('inp-bank-note').value.trim();
-  const user=auth.currentUser;
-  if(!bankTxnType)       return showToast('Select Withdrawal or Deposit');
-  if(!amount||amount<=0) return showToast('Enter a valid amount');
-  if(!bank)              return showToast('Select a bank');
-  if(!dd||!mm||!yyyy)    return showToast('Enter a valid date');
-  const date=`${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
-  db.collection('users').doc(user.uid).collection('banktxns').add({
-    type:bankTxnType,bank,amount,date,note,
-    timestamp:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(()=>{
-    showToast(`${bankTxnType==='withdrawal'?'Withdrawal':'Deposit'} recorded!`);
-    document.getElementById('inp-bank-amount').value='';
-    document.getElementById('inp-bank-note').value='';
-    document.getElementById('inp-bank').value='';
-    bankTxnType='';
-    document.getElementById('bank-btn-w').className='bank-type-btn';
-    document.getElementById('bank-btn-d').className='bank-type-btn';
-    const btn=document.getElementById('bank-submit-btn');
-    btn.style.background='var(--surface2)'; btn.style.color='var(--text)'; btn.style.border='1px solid var(--border)';
-  }).catch(()=>showToast('Save failed'));
-}
-
-function delBankTxn(id){
-  if(!confirm('Delete this transaction?')) return;
-  db.collection('users').doc(auth.currentUser.uid).collection('banktxns').doc(id).delete()
-    .then(()=>showToast('Deleted')).catch(()=>showToast('Delete failed'));
-}
-
-function renderBankView(){
-  const totalDep=banktxns.filter(t=>t.type==='deposit').reduce((s,t)=>s+t.amount,0);
-  const totalWdl=banktxns.filter(t=>t.type==='withdrawal').reduce((s,t)=>s+t.amount,0);
-  const net=totalDep-totalWdl;
-  document.getElementById('bv-total-dep').textContent='₹'+totalDep.toLocaleString('en-IN');
-  document.getElementById('bv-total-wdl').textContent='₹'+totalWdl.toLocaleString('en-IN');
-  const netEl=document.getElementById('bv-net');
-  netEl.textContent=(net>=0?'+':'')+  '₹'+Math.abs(net).toLocaleString('en-IN');
-  netEl.style.color=net>=0?'#5af5c8':'#f55a8c';
-
-  const list=document.getElementById('bank-txn-list-full');
-  if(!banktxns.length){ list.innerHTML='<div class="empty-state"><div class="empty-icon">🏦</div>No transactions yet.</div>'; return; }
-  list.innerHTML=banktxns.map(t=>{
-    const isWdl=t.type==='withdrawal', color=isWdl?'#f55a8c':'#5af5c8';
-    return `<div class="bank-txn-row">
-      <div class="bank-txn-dot" style="background:${color}"></div>
-      <div class="bank-txn-info">
-        <div class="bank-txn-type">${isWdl?'⬇ Withdrawal':'⬆ Deposit'} · ${t.bank||''}</div>
-        ${t.note?`<div class="bank-txn-note">${t.note}</div>`:''}
-        <div class="bank-txn-date">${t.date?formatDate(t.date):''}</div>
-      </div>
-      <div class="bank-txn-amount" style="color:${color}">${isWdl?'-':'+'}₹${Number(t.amount).toLocaleString('en-IN')}</div>
-      <button class="bank-txn-del" onclick="delBankTxn('${t.id}')">×</button>
-    </div>`;
-  }).join('');
-}
 
 // ══ ANALYTICS CATEGORY FILTER ════════════════════════════════════
 function renderCatFilterRow(){
@@ -386,7 +346,6 @@ function toggleSubcatFilter(name){
   else{ selSubcatFilters.delete('__ALL__'); if(selSubcatFilters.has(name)) selSubcatFilters.delete(name); else selSubcatFilters.add(name); if(selSubcatFilters.size===0) selSubcatFilters=new Set(['__ALL__']); }
   renderSubcatFilterRow(); renderAnalytics();
 }
-
 function getActiveCatNames(){ return selCatFilters.has('__ALL__')?cats.map(c=>c.name):[...selCatFilters]; }
 
 // ══ ANALYTICS PERIOD ══════════════════════════════════════════════
@@ -404,7 +363,6 @@ function setPeriod(p,btn){
   dateNav.style.display='flex'; renderAnalytics();
 }
 function shiftPeriod(dir){ periodOffset+=dir; renderAnalytics(); }
-
 function useDefaultWeek(){
   const now=new Date(); now.setDate(now.getDate()+periodOffset*7);
   const mon=new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7));
@@ -484,7 +442,6 @@ function renderAnalytics(){
   else{bd.innerHTML=catList.map(([cat,amt])=>{const color=getCatColor(cat),pct=total?Math.round((amt/total)*100):0;return`<div class="breakdown-row"><div class="bd-dot" style="background:${color}"></div><div class="bd-cat">${getCatIcon(cat)} ${cat}</div><div class="bd-bar-wrap"><div class="bd-bar" style="width:${pct}%;background:${color}"></div></div><div class="bd-amount">₹${amt.toLocaleString('en-IN')}</div><div class="bd-pct">${pct}%</div></div>`;}).join('');}
 
   renderTrendTable(activeCats,start);
-  renderBankSummary();
 }
 
 function renderTrendTable(activeCats,curStart){
@@ -501,22 +458,6 @@ function renderTrendTable(activeCats,curStart){
   const thead=`<tr><th>Period</th>${catCols}<th style="text-align:right">Total</th><th style="text-align:right">Entries</th><th style="min-width:100px">Bar</th></tr>`;
   const tbody=rows.map(r=>{const pct=maxTotal?Math.round((r.total/maxTotal)*100):0,barColor=r.total===maxTotal?'var(--accent)':'var(--muted)';let catTds='';if(!showAll&&catNames.length>1)catTds=catNames.map(n=>`<td class="amt">${r.perCat[n]?'₹'+r.perCat[n].toLocaleString('en-IN'):'-'}</td>`).join('');return`<tr><td>${r.label}</td>${catTds}<td class="amt">₹${r.total.toLocaleString('en-IN')}</td><td class="cnt">${r.cnt}</td><td><div style="height:6px;border-radius:4px;background:var(--border);overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width 0.4s"></div></div></td></tr>`;}).join('');
   wrap.innerHTML=`<table class="trend-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
-}
-
-function renderBankSummary(){
-  const{start,end}=getPeriodDates();
-  const periodTxns=(start&&end)?banktxns.filter(t=>t.date>=start&&t.date<=end):banktxns;
-  const totalDep=periodTxns.filter(t=>t.type==='deposit').reduce((s,t)=>s+t.amount,0);
-  const totalWdl=periodTxns.filter(t=>t.type==='withdrawal').reduce((s,t)=>s+t.amount,0);
-  const net=totalDep-totalWdl;
-  document.getElementById('bank-total-dep').textContent='₹'+totalDep.toLocaleString('en-IN');
-  document.getElementById('bank-total-wdl').textContent='₹'+totalWdl.toLocaleString('en-IN');
-  const netEl=document.getElementById('bank-net');
-  netEl.textContent=(net>=0?'+':'')+  '₹'+Math.abs(net).toLocaleString('en-IN');
-  netEl.className='bank-stat-value '+(net>0?'positive':net<0?'negative':'neutral');
-  const statNet=document.getElementById('stat-net-bank');
-  statNet.textContent=(net>=0?'+':'-')+'₹'+Math.abs(net).toLocaleString('en-IN');
-  statNet.style.color=net>=0?'#5af5c8':'#f55a8c';
 }
 
 // ══ PDF EXPORT ════════════════════════════════════════════════════
