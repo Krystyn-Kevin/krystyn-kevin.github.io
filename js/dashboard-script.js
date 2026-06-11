@@ -10,7 +10,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(), db=firebase.firestore();
 
-const S_CATS='spendex_cats_v3', S_SUBCATS='spendex_subcats_v1', S_THEME='spendex_theme', S_ACCOUNTS='spendex_accounts_v1';
+const S_CATS='spendex_cats_v3', S_SUBCATS='spendex_subcats_v1', S_THEME='spendex_theme';
 
 // ══ DEFAULT CATEGORIES & SUBCATEGORIES ════════════════════════════
 const DEFAULTS=[
@@ -34,7 +34,7 @@ const DEFAULT_SUBCATS={
 
 // ══ STATE ═════════════════════════════════════════════════════════
 let expenses        = [];
-let accounts        = JSON.parse(localStorage.getItem(S_ACCOUNTS)||'[]');
+let accounts        = []; // Now fetched from Firestore
 let cats            = JSON.parse(localStorage.getItem(S_CATS)||'null')||DEFAULTS.map(d=>({...d}));
 let subcats         = JSON.parse(localStorage.getItem(S_SUBCATS)||'null') || Object.fromEntries(Object.entries(DEFAULT_SUBCATS).map(([k,v])=>[k,[...v]]));
 
@@ -53,7 +53,6 @@ let customRangeEnd  = '';
 
 function saveCats()   { localStorage.setItem(S_CATS,JSON.stringify(cats)); }
 function saveSubcats(){ localStorage.setItem(S_SUBCATS,JSON.stringify(subcats)); }
-function saveAccounts(){ localStorage.setItem(S_ACCOUNTS,JSON.stringify(accounts)); renderAccounts(); }
 function getCatColor(n){ const c=cats.find(c=>c.name===n); return c?c.color:'#c8f55a'; }
 function getCatIcon(n) { const c=cats.find(c=>c.name===n); return c?c.icon:'🏷'; }
 function formatDate(iso){ const[y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
@@ -69,9 +68,16 @@ auth.onAuthStateChanged(user=>{
   ['inp-dd','inp-mm','inp-yyyy'].forEach((id,i)=>document.getElementById(id).value=[n.getDate(),n.getMonth()+1,n.getFullYear()][i]);
   
   renderCatGrid();
-  renderAccounts();
+  listenForAccounts(user.uid);
   listenForExpenses(user.uid);
 });
+
+function listenForAccounts(uid){
+  db.collection('users').doc(uid).collection('accounts').orderBy('timestamp','desc').onSnapshot(snap=>{
+    accounts=snap.docs.map(doc=>({id:doc.id,...doc.data()}));
+    renderAccounts();
+  });
+}
 
 function listenForExpenses(uid){
   db.collection('users').doc(uid).collection('expenses').orderBy('timestamp','desc').onSnapshot(snap=>{
@@ -98,7 +104,7 @@ function switchView(v,btn){
   if(v==='analytics'){ renderCatFilterRow(); renderAnalytics(); }
 }
 
-// ══ ACCOUNTS (ADD / REMOVE) ═══════════════════════════════════════
+// ══ ACCOUNTS (ADD / REMOVE VIA FIRESTORE) ═════════════════════════
 function openAccModal() { document.getElementById('acc-modal').classList.add('open'); }
 function closeAccModal() { 
   document.getElementById('acc-modal').classList.remove('open');
@@ -140,20 +146,24 @@ function addAccount() {
   
   if(!dispName || !holderName || !accNum) return showToast('Fill all account details');
   
-  accounts.push({ id: 'acc_' + Date.now(), dispName, holderName, accNum });
-  saveAccounts();
-  showToast('Account added');
-  
-  document.getElementById('acc-name').value='';
-  document.getElementById('acc-holder').value='';
-  document.getElementById('acc-num').value='';
+  const user = auth.currentUser;
+  db.collection('users').doc(user.uid).collection('accounts').add({
+    dispName, holderName, accNum,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    showToast('Account added to cloud');
+    document.getElementById('acc-name').value='';
+    document.getElementById('acc-holder').value='';
+    document.getElementById('acc-num').value='';
+  }).catch(() => showToast('Failed to save account'));
 }
 
 function deleteAccount(id) {
   if(!confirm('Delete this account?')) return;
-  accounts = accounts.filter(a => a.id !== id);
-  saveAccounts();
-  showToast('Account deleted');
+  const user = auth.currentUser;
+  db.collection('users').doc(user.uid).collection('accounts').doc(id).delete()
+    .then(() => showToast('Account deleted'))
+    .catch(() => showToast('Failed to delete account'));
 }
 
 // ══ CATEGORY GRID ═════════════════════════════════════════════════
@@ -228,7 +238,7 @@ function addExpense(){
   const note=document.getElementById('inp-note').value.trim();
   const user=auth.currentUser;
   
-  if(!account)             return showToast('Select an account');
+  if(!account)           return showToast('Select an account');
   if(!amount||amount<=0) return showToast('Enter a valid amount');
   if(!dd||!mm||!yyyy)    return showToast('Enter a valid date');
   if(!selectedCat)       return showToast('Select a category');
@@ -296,7 +306,6 @@ function deleteSelectedExpenses() {
     showToast(`${checkboxes.length} expense(s) deleted`);
   }).catch(() => showToast('Failed to delete some expenses'));
 }
-
 
 // ══ ANALYTICS CATEGORY FILTER ════════════════════════════════════
 function renderCatFilterRow(){
