@@ -83,17 +83,27 @@ auth.onAuthStateChanged(user => {
   document.documentElement.setAttribute('data-theme', saved);
 
   const n = new Date();
-  ['inp-dd','inp-mm','inp-yyyy'].forEach((id,i) =>
-    document.getElementById(id).value = [n.getDate(), n.getMonth()+1, n.getFullYear()][i]);
-  ['inp-bank-dd','inp-bank-mm','inp-bank-yyyy'].forEach((id,i) =>
-    document.getElementById(id).value = [n.getDate(), n.getMonth()+1, n.getFullYear()][i]);
+  
+  // SAFE CHECK: Only assign expense dates if the element exists
+  const expDd = document.getElementById('inp-dd');
+  if (expDd) {
+    ['inp-dd','inp-mm','inp-yyyy'].forEach((id,i) =>
+      document.getElementById(id).value = [n.getDate(), n.getMonth()+1, n.getFullYear()][i]);
+  }
+
+  // SAFE CHECK: Only assign bank dates if the element exists
+  const bankDd = document.getElementById('inp-bank-dd');
+  if (bankDd) {
+    ['inp-bank-dd','inp-bank-mm','inp-bank-yyyy'].forEach((id,i) =>
+      document.getElementById(id).value = [n.getDate(), n.getMonth()+1, n.getFullYear()][i]);
+  }
 
   loadCatsFromCloud(user.uid).then(() => {
     document.body.style.display = 'block';
     renderCatGrid();
     listenForExpenses(user.uid);
     listenForBankTxns(user.uid);
-    listenForAccounts(user.uid);   // BUG 3 FIX: was never called
+    listenForAccounts(user.uid);
   });
 });
 
