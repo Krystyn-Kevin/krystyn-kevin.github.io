@@ -30,8 +30,3 @@ Use this as your "where to edit what" reference.
 - **CSS** = how it looks
 - **JS** = how it behaves
 - **Firestore section in JS** = where data persists/syncs
-
-## Can I Paste The Above Cheat Sheet Here?
-
-Yes. You can paste the same cheat sheet text here anytime and update it as your app grows.
-
